@@ -1,4 +1,47 @@
+// js/agenda.js
+(() => {
+  const list = document.querySelector('#events-list');
+  const cityEl = document.querySelector('#city-filter');
+  const ds = document.querySelector('#date-start');
+  const de = document.querySelector('#date-end');
+  const btn = document.querySelector('#apply-filters');
+  if (!list) return;
 
-(async function(){const ul=document.getElementById('events-list'),cityInp=document.getElementById('city-filter'),startInp=document.getElementById('date-start'),endInp=document.getElementById('date-end'),btn=document.getElementById('apply-filters');let events=[];try{events=await (await fetch('data/events.json')).json();}catch{}
-function fmtDate(s){const d=new Date(s);return d.toLocaleDateString('pt-BR',{day:'2-digit',month:'short',year:'numeric'});}function toICS(e){const dt=new Date(e.data);const y=dt.getUTCFullYear();const m=String(dt.getUTCMonth()+1).padStart(2,'0');const d=String(dt.getUTCDate()).padStart(2,'0');const ics=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Cosprysma//Agenda//PT-BR','BEGIN:VEVENT',`UID:${crypto.randomUUID()}@cosprysma`,`DTSTAMP:${y}${m}${d}T120000Z`,`DTSTART:${y}${m}${d}T120000Z`,`SUMMARY:${e.nome}`,`LOCATION:${e.local} - ${e.cidade}`,`DESCRIPTION:${e.descricao}`,'END:VEVENT','END:VCALENDAR'].join('\r\n');const blob=new Blob([ics],{type:'text/calendar'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`${e.nome.replace(/\s+/g,'_')}.ics`;a.click();URL.revokeObjectURL(a.href);}function render(){let list=[...events];const city=cityInp.value.trim().toLowerCase();const ds=startInp.value?new Date(startInp.value):null;const de=endInp.value?new Date(endInp.value):null;if(city)list=list.filter(e=>e.cidade.toLowerCase().includes(city));if(ds)list=list.filter(e=>new Date(e.data)>=ds);if(de)list=list.filter(e=>new Date(e.data)<=de);list.sort((a,b)=>new Date(a.data)-new Date(b.data));ul.innerHTML=list.map(e=>`<li><div class="row"><div><h3>${e.nome}</h3><p><strong>${fmtDate(e.data)}</strong> · ${e.cidade}</p><p class="muted">${e.local} — ${e.descricao}</p></div><div class="row gap">${e.link?`<a class="btn ghost" href="${e.link}" target="_blank" rel="noopener">Detalhes</a>`:''}<button class="btn add-cal" data-id="${e.id||e.nome}">Adicionar ao calendário</button></div></div></li>`).join('');ul.querySelectorAll('.add-cal').forEach(b=>b.addEventListener('click',()=>{const item=list.find(x=>(x.id||x.nome)===b.dataset.id);if(item)toICS(item);}));}
-btn.addEventListener('click',render);render();})();
+  async function load() {
+    const params = new URLSearchParams();
+    if (cityEl?.value) params.set('city', cityEl.value);
+    if (ds?.value) params.set('from', ds.value);
+    if (de?.value) params.set('to', de.value);
+    const r = await fetch('/api/eventos?' + params.toString());
+    const items = await r.json();
+    render(items);
+  }
+
+  function render(items) {
+    list.innerHTML = '';
+    if (!items.length) {
+      list.innerHTML = '<li class="muted">Nenhum evento encontrado.</li>';
+      return;
+    }
+    items.forEach(ev => {
+      const li = document.createElement('li');
+      const start = ev.startsAt ? new Date(ev.startsAt) : null;
+      const end = ev.endsAt ? new Date(ev.endsAt) : null;
+      li.innerHTML = `
+        <div class="row">
+          <div>
+            <strong>${ev.title}</strong>
+            <div class="muted">${[ev.city, ev.venue].filter(Boolean).join(' • ')}</div>
+          </div>
+          <div style="text-align:right">
+            <div>${start ? start.toLocaleDateString() : ''}${end ? ' – ' + end.toLocaleDateString() : ''}</div>
+            ${ev.url ? `<a class="link" href="${ev.url}" target="_blank" rel="noopener">Saiba mais</a>` : ''}
+          </div>
+        </div>`;
+      list.appendChild(li);
+    });
+  }
+
+  btn?.addEventListener('click', load);
+  load();
+})();
