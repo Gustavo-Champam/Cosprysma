@@ -1,14 +1,79 @@
+// js/main.js
 
-(function(){
-  const burger=document.getElementById('burger'),nav=document.getElementById('nav');
-  burger?.addEventListener('click',()=>nav.classList.toggle('open'));
-  const toggle=document.getElementById('theme-toggle'),saved=localStorage.getItem('theme');
-  if(saved)document.documentElement.setAttribute('data-theme',saved);
-  toggle?.addEventListener('click',()=>{const cur=document.documentElement.getAttribute('data-theme')||'dark';const next=cur==='dark'?'light':'dark';document.documentElement.setAttribute('data-theme',next);localStorage.setItem('theme',next);});
-  const toTop=document.querySelector('.to-top');window.addEventListener('scroll',()=>{if(window.scrollY>500)toTop?.classList.add('show');else toTop?.classList.remove('show');});toTop?.addEventListener('click',()=>window.scrollTo({top:0,behavior:'smooth'}));
-  const ro=new IntersectionObserver((es)=>{for(const e of es) if(e.isIntersecting) e.target.classList.add('show');},{threshold:.12});document.querySelectorAll('.reveal').forEach(el=>ro.observe(el));
-  const nl=document.getElementById('nl-form');nl?.addEventListener('submit',e=>{e.preventDefault();const fd=new FormData(nl);const list=JSON.parse(localStorage.getItem('cosprysma_nl')||'[]');list.push({email:fd.get('email'),created_at:new Date().toISOString()});localStorage.setItem('cosprysma_nl',JSON.stringify(list));nl.reset();alert('Assinatura registrada (demo).');});
-  const recent=document.getElementById('recent-photos');if(recent){fetch('data/gallery.json').then(r=>r.json()).then(items=>{recent.innerHTML=items.slice(0,12).map(it=>`<img src="${it.src}" alt="${it.alt}" loading="lazy">`).join('');}).catch(()=>{});}
-  const contactForm=document.getElementById('contact-form');if(contactForm){contactForm.addEventListener('submit',e=>{e.preventDefault();const data=Object.fromEntries(new FormData(contactForm).entries());const key='cosprysma_contact';const list=JSON.parse(localStorage.getItem(key)||'[]');list.push({...data,created_at:new Date().toISOString()});localStorage.setItem(key,JSON.stringify(list));document.getElementById('contact-success').hidden=false;contactForm.reset();});}
-  if('serviceWorker'in navigator){navigator.serviceWorker.register('service-worker.js').catch(()=>{});}
+// Toggle menu (hambúrguer)
+(() => {
+  const burger = document.getElementById('burger');
+  const nav = document.getElementById('nav');
+  if (!burger || !nav) return;
+  burger.addEventListener('click', () => {
+    nav.classList.toggle('open');
+    burger.setAttribute('aria-expanded', nav.classList.contains('open') ? 'true' : 'false');
+  });
+  // fecha ao clicar num link
+  nav.addEventListener('click', (e) => {
+    const a = e.target.closest('a');
+    if (!a) return;
+    if (nav.classList.contains('open')) {
+      nav.classList.remove('open');
+      burger.setAttribute('aria-expanded', 'false');
+    }
+  });
+})();
+
+// Tema (dark/light)
+(() => {
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  const root = document.documentElement;
+  const KEY = 'cosprysma-theme';
+  const saved = localStorage.getItem(KEY);
+  if (saved) root.setAttribute('data-theme', saved);
+  btn.addEventListener('click', () => {
+    const cur = root.getAttribute('data-theme') || 'dark';
+    const next = cur === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    localStorage.setItem(KEY, next);
+  });
+})();
+
+// Reveal on scroll
+(() => {
+  const els = [...document.querySelectorAll('.reveal')];
+  if (!els.length) return;
+  const io = new IntersectionObserver((entries)=>{
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('show'); io.unobserve(e.target); }});
+  }, { threshold: 0.12 });
+  els.forEach(el => io.observe(el));
+})();
+
+// Voltar ao topo
+(() => {
+  const btn = document.querySelector('.to-top');
+  if (!btn) return;
+  window.addEventListener('scroll', () => {
+    if (window.scrollY > 400) btn.classList.add('show'); else btn.classList.remove('show');
+  });
+  btn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+})();
+
+// Newsletter → backend opcional (Vercel + Mongo). Se não usar, pode remover este bloco.
+(() => {
+  const f = document.querySelector('#nl-form');
+  if (!f) return;
+  f.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = new FormData(f).get('email');
+    try {
+      const r = await fetch('/api/newsletter/subscribe', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ email })
+      });
+      const data = await r.json();
+      alert(data.ok ? 'Confirme sua inscrição pelo e-mail! ✅' : 'Erro: ' + (data.error || 'tente de novo'));
+      if (data.ok) f.reset();
+    } catch (err) {
+      alert('Falha na conexão. Tente novamente.');
+    }
+  });
 })();
